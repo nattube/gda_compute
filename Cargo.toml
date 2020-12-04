@@ -1,0 +1,17 @@
+[package]
+name = "gda_core"
+version = "0.1.0"
+authors = ["nnuss <nathanael.nussbaumer@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "gda_core"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[dependencies]
+serde = {version = "1.0.117", features = ["derive"]}
