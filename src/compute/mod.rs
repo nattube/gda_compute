@@ -1,4 +1,4 @@
-mod gpu;
+pub mod gpu;
 
 pub fn run() -> Vec<u32> {
     gpu::build_shader();

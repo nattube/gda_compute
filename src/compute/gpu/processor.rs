@@ -14,7 +14,7 @@ pub struct TensorBinding<'a> {
 
 pub struct Tensor {
     value: RefCell<Vec<u32>>,
-    shape: Vec<u32>
+    //shape: Vec<u32>
 }
 
 impl Tensor {

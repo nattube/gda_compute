@@ -155,14 +155,14 @@ impl GPUOperation<Vec<u32>, Vec<u32>> for TestOp {
     
 }
 
-struct GPU {
+pub struct GPU {
     exist: bool,
     device: Option<Device>,
     queue: Option<Queue>
 }
 
 impl GPU {
-    fn new() -> GPU {
+    pub fn new() -> GPU {
         let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         let adapter = 
             pollster::block_on(instance

@@ -26,3 +26,10 @@ anyhow = "1.0"
 fs_extra = "1.1"
 glob = "0.3"
 shaderc = "0.7"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "my_benchmark"
+harness = false
