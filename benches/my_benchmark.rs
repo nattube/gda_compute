@@ -2,34 +2,34 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use gda_core::compute::gpu::*;
 use gda_core::compute::gpu::processor::*;
 
-fn benchmarkGPU(shader: &Shader) {
-    
-    let mut gpu = GPU::new();
+const VEC_SIZE: usize = 60000;
 
-    (*shader).execute(&mut gpu);
+fn benchmark_gpu(shader: &mut Shader, gpu: &mut GPU) {
+    (*shader).execute(gpu);
 }
 
 
-fn benchmarkCPU() {
-    let mut a = vec![1u32; 60000];
-    let mut b = vec![2u32; 60000];
+fn benchmark_cpu(a: &Vec<f32>, b: &Vec<f32>) {
+    let mut c = Vec::<f32>::new();
 
-    let mut c = Vec::<u32>::new();
-
-    for i in 0..60000 {
-        c.push(a[i] + b[i]);
+    for i in 0..VEC_SIZE {
+        c.push(a[i] * b[i]);
     }
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut a = Tensor::new(vec![1; 60000]);
-    let mut b = Tensor::new(vec![2; 60000]);
+    let mut a = Tensor::new(vec![1f32; VEC_SIZE]);
+    let mut b = Tensor::new(vec![2f32; VEC_SIZE]);
 
     let op = &a + &b;
-    let shader = Shader::build(&op);
+    let mut gpu = GPU::new();
+    let mut shader = Shader::build(&op, &mut gpu);
 
-    c.bench_function("CPU", |b| b.iter(|| benchmarkCPU()));
-    c.bench_function("GPU", |b| b.iter(|| benchmarkGPU(&shader)));
+    let a1 = vec![1f32; VEC_SIZE];
+    let b1 = vec![2f32; VEC_SIZE];
+
+    c.bench_function("CPU", |b| b.iter(|| benchmark_cpu(black_box(&a1), black_box(&b1))));
+    c.bench_function("GPU", |b| b.iter(|| benchmark_gpu(&mut shader, &mut gpu)));
 }
 
 criterion_group!(benches, criterion_benchmark);
