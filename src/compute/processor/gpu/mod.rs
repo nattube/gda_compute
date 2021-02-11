@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 pub mod shader;
 use shader::Shader;
-use crate::compute::tensor::{Operation};
+use crate::compute::tensor::{Operation, TensorOperationResult};
 use crate::compute::processor::Compiled;
 
 pub struct GPU {
@@ -16,11 +16,11 @@ pub struct GPU {
 }
 
 impl<'a> super::AbstractProcessor<'a> for GPU {
-    fn build(&mut self, op: &'a Operation<'a>) -> Compiled<'a> {
+    fn build(&mut self, op: Operation<'a>) -> Compiled<'a> {
         Compiled::GPU(Rc::new(RefCell::new(Shader::build(op, self))))
     }
 
-    fn execute(&mut self, compiled: &Compiled<'a>) -> Vec<f32> {
+    fn execute(&mut self, compiled: &Compiled<'a>) -> TensorOperationResult {
         return match compiled {
             Compiled::GPU(c) => (*c.borrow_mut()).execute(self)
         }
@@ -37,12 +37,14 @@ impl GPU {
                     compatible_surface: None,
         })).unwrap();
 
+        //println!("{:?}", adapter.limits());
+
         if let Ok((device, queue)) = 
             pollster::block_on(adapter
                 .request_device(
                     &wgpu::DeviceDescriptor {
                         features: wgpu::Features::empty(),
-                        limits: wgpu::Limits::default(),
+                        limits: adapter.limits(),
                         shader_validation: true,
                     },
                     None,

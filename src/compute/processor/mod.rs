@@ -1,7 +1,7 @@
 pub mod gpu;
 use gpu::GPU;
 use gpu::shader::Shader;
-use crate::compute::tensor::{Operation};
+use crate::compute::tensor::{Operation, TensorOperationResult};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -10,8 +10,8 @@ pub enum Compiled<'a> {
 }
 
 pub trait AbstractProcessor<'a> {
-    fn build(&mut self, op: &'a Operation<'a>) -> Compiled<'a>;
-    fn execute(&mut self, compiled: &Compiled<'a>) -> Vec<f32>;
+    fn build(&mut self, op: Operation<'a>) -> Compiled<'a>;
+    fn execute(&mut self, compiled: &Compiled<'a>) -> TensorOperationResult;
 }
 
 pub enum ProcessorSelectionConstraint {
@@ -34,11 +34,11 @@ impl<'a> Processor<'a> {
         unimplemented!("Missing");
     }
 
-    pub fn build(&mut self,  op: &'a Operation<'a>) -> Compiled<'a> {
+    pub fn build(&mut self,  op: Operation<'a>) -> Compiled<'a> {
         self.processor.build(op)
     }
 
-    pub fn execute(&mut self, compiled: &Compiled<'a>) -> Vec<f32> {
+    pub fn execute(&mut self, compiled: &Compiled<'a>) -> TensorOperationResult {
         self.processor.execute(compiled)
     }
 }

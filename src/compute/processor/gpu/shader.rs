@@ -1,13 +1,13 @@
 use std::{convert::TryInto};
 use wgpu::util::DeviceExt;
-use wgpu::{Buffer, ComputePipeline, BindGroup, BindGroupLayout};
+use wgpu::{Buffer, ComputePipeline, BindGroup, BindGroupLayout, Device};
 use wgpu;
-use crate::compute::tensor::{TensorBinding, TensorBindingHolder, Operation};
+use crate::compute::tensor::{Operation, Tensor, TensorBinding, TensorError, TensorOperationResult, TensorHolder};
 
 pub struct Shader<'a> {
     spirv: Vec<u8>,
     result_binding: u32,
-    inputs: Vec<&'a TensorBindingHolder<'a>>,
+    inputs: Vec<TensorBinding<'a>>,
     compute_pipeline: ComputePipeline,
     bind_group: BindGroup,
     bind_group_layout: BindGroupLayout,
@@ -15,20 +15,30 @@ pub struct Shader<'a> {
     storage_buffers: Vec<Buffer>,
     result_buffer: Buffer,
     result_size: wgpu::BufferAddress,
+    tensor_result: TensorOperationResult
 }
 
 impl<'a> Shader<'a> {
-    pub(crate) fn build(op: &'a Operation<'a>, gpu: &mut super::GPU) -> Shader<'a> { 
-        if let Some(device) = gpu.device.as_mut() {
+    pub(crate) fn build(op: Operation<'a>, gpu: &mut super::GPU) -> Shader<'a> { 
+        if let Some(device) = gpu.device.as_mut() {            
             let (spirv, inputs, result_binding) = op.build_gpu(); 
 
             inputs.iter().for_each(|x| drop(x.has_changed()));
 
             let cs_module = (*device).create_shader_module(wgpu::util::make_spirv(&spirv));
 
-            let resurlt_vec = vec![0f32,0.0,0.0];
-            let slice_size = resurlt_vec.len() * std::mem::size_of::<u32>();
-            let size = slice_size as wgpu::BufferAddress;
+            let tensor_result = match op {
+                Operation::DualOp {result, ..} | Operation::SingleOp {result, ..} => result.copy(),
+                _ => panic!("unimplemented error case")
+            };
+
+            if let TensorOperationResult::Error(x) = tensor_result {
+                panic!("unimplemented error case")
+            }
+
+            println!("Result vec form: {:?}", tensor_result);
+
+            let size = tensor_result.get_mem_size();
 
             let staging_buffer = (*device).create_buffer(&wgpu::BufferDescriptor {
                 label: None,
@@ -37,35 +47,13 @@ impl<'a> Shader<'a> {
                 mapped_at_creation: false,
             });
 
-            let storage_buffers: Vec<wgpu::Buffer> = inputs.iter().map(|&i| {
-                return match i {
-                    TensorBindingHolder::Int(x) 
-                    | TensorBindingHolder::Uint(x) 
-                    | TensorBindingHolder::Float(x) 
-                    | TensorBindingHolder::Double(x) 
-                    | TensorBindingHolder::Boolean(x) => {
-                        (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Storage Buffer"),
-                            contents: bytemuck::cast_slice(&x.value.get_value()),
-                            usage: wgpu::BufferUsage::STORAGE
-                                | wgpu::BufferUsage::COPY_DST
-                                | wgpu::BufferUsage::COPY_SRC,
-                        })
-                    }
-                }                
-            }).collect();
+            let storage_buffers: Vec<wgpu::Buffer> = inputs.iter().map(|i| {
+                Shader::get_buffer(device, &i.value, "Storage Buffer")
+            }).collect();            
 
-            
+            let result_buffer = Self::get_buffer_from_opres(device, &tensor_result, "Result Buffer");
 
-            let result_buffer = (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Result Buffer"),
-                contents: bytemuck::cast_slice(&resurlt_vec),
-                usage: wgpu::BufferUsage::STORAGE
-                    | wgpu::BufferUsage::COPY_DST
-                    | wgpu::BufferUsage::COPY_SRC,
-            });
-
-            let mut layout: Vec<wgpu::BindGroupLayoutEntry> = inputs.iter().map(|&i| { 
+            let mut layout: Vec<wgpu::BindGroupLayoutEntry> = inputs.iter().map(|i| { 
                 wgpu::BindGroupLayoutEntry {
                     binding: i.id,
                     visibility: wgpu::ShaderStage::COMPUTE,
@@ -131,24 +119,102 @@ impl<'a> Shader<'a> {
                 },
             });
             
-            return Shader {spirv, result_binding, inputs, staging_buffer, compute_pipeline, storage_buffers, bind_group, bind_group_layout, result_buffer, result_size: size}
+            return Shader {spirv, result_binding, inputs, staging_buffer, compute_pipeline, storage_buffers, bind_group, bind_group_layout, result_buffer, result_size: size, tensor_result}
         }
         panic!("No GPU!");
     }
 
-    pub(crate) fn execute(&mut self, gpu: &mut super::GPU) -> Vec<f32> {
+    fn get_buffer_from_opres(device: &mut Device, tensor: &TensorOperationResult, label: &str) -> wgpu::Buffer {
+        return match tensor {
+            TensorOperationResult::Int(x) => {
+                (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Storage Buffer"),
+                    contents: bytemuck::cast_slice(&x.get_value()),
+                    usage: wgpu::BufferUsage::STORAGE
+                        | wgpu::BufferUsage::COPY_DST
+                        | wgpu::BufferUsage::COPY_SRC,
+                })              
+            },
+            TensorOperationResult::UInt(x) => {
+                (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Storage Buffer"),
+                    contents: bytemuck::cast_slice(&x.get_value()),
+                    usage: wgpu::BufferUsage::STORAGE
+                        | wgpu::BufferUsage::COPY_DST
+                        | wgpu::BufferUsage::COPY_SRC,
+                })              
+            },
+            TensorOperationResult::Float(x) => {
+                (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Storage Buffer"),
+                    contents: bytemuck::cast_slice(&x.get_value()),
+                    usage: wgpu::BufferUsage::STORAGE
+                        | wgpu::BufferUsage::COPY_DST
+                        | wgpu::BufferUsage::COPY_SRC,
+                })              
+            },
+            TensorOperationResult::Double(x) => {
+                (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Storage Buffer"),
+                    contents: bytemuck::cast_slice(&x.get_value()),
+                    usage: wgpu::BufferUsage::STORAGE
+                        | wgpu::BufferUsage::COPY_DST
+                        | wgpu::BufferUsage::COPY_SRC,
+                })              
+            },
+            _ => panic!("Unimlemented Error handling")
+        }
+    }
+
+    fn get_buffer(device: &mut Device, tensor: &TensorHolder, label: &str) -> wgpu::Buffer {
+        return match tensor {
+            TensorHolder::Int(x) => {
+                (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Storage Buffer"),
+                    contents: bytemuck::cast_slice(&x.get_value()),
+                    usage: wgpu::BufferUsage::STORAGE
+                        | wgpu::BufferUsage::COPY_DST
+                        | wgpu::BufferUsage::COPY_SRC,
+                })              
+            },
+            TensorHolder::UInt(x) => {
+                (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Storage Buffer"),
+                    contents: bytemuck::cast_slice(&x.get_value()),
+                    usage: wgpu::BufferUsage::STORAGE
+                        | wgpu::BufferUsage::COPY_DST
+                        | wgpu::BufferUsage::COPY_SRC,
+                })              
+            },
+            TensorHolder::Float(x) => {
+                (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Storage Buffer"),
+                    contents: bytemuck::cast_slice(&x.get_value()),
+                    usage: wgpu::BufferUsage::STORAGE
+                        | wgpu::BufferUsage::COPY_DST
+                        | wgpu::BufferUsage::COPY_SRC,
+                })              
+            },
+            TensorHolder::Double(x) => {
+                (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Storage Buffer"),
+                    contents: bytemuck::cast_slice(&x.get_value()),
+                    usage: wgpu::BufferUsage::STORAGE
+                        | wgpu::BufferUsage::COPY_DST
+                        | wgpu::BufferUsage::COPY_SRC,
+                })              
+            },
+            _ => panic!("Unimlemented Error handling")
+        }
+    }
+
+    pub(crate) fn execute(&mut self, gpu: &mut super::GPU) -> TensorOperationResult {
         if let Some(device) = gpu.device.as_mut() {            
             let mut changed = false;
             for i in 0..self.inputs.len() {
                 if self.inputs[i].has_changed() {
                     changed = true;
-                    self.storage_buffers[i] = (*device).create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Storage Buffer"),
-                        contents: bytemuck::cast_slice(&self.inputs[i].value.get_value()),
-                        usage: wgpu::BufferUsage::STORAGE
-                            | wgpu::BufferUsage::COPY_DST
-                            | wgpu::BufferUsage::COPY_SRC,
-                    });                  
+                    self.storage_buffers[i] = Shader::get_buffer(device, &self.inputs[i].value, "Storage Buffer");
                 }
             }
 
@@ -162,7 +228,7 @@ impl<'a> Shader<'a> {
                     });
                 }
 
-            
+                //TODO: result_buffers shape shoud be implemented as relationship to other
                 b_group.push(wgpu::BindGroupEntry {
                     binding: self.result_binding,
                     resource: wgpu::BindingResource::Buffer(self.result_buffer.slice(..)),
@@ -200,21 +266,17 @@ impl<'a> Shader<'a> {
         
             if let Ok(()) = pollster::block_on(buffer_future) {
                 let data = buffer_slice.get_mapped_range();
-                let result = data
-                    .chunks_exact(4)
-                    .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
-                    .collect();
+                self.tensor_result.map_from_staging_buffer(data);
             
                 // With the current interface, we have to make sure all mapped views are
                 // dropped before we unmap the buffer.
-                drop(data);
                 self.staging_buffer.unmap();
             
-                return result
+                return self.tensor_result.copy()
             } else {
-                panic!("failed to run compute on gpu!")
+                return TensorOperationResult::Error(TensorError::Unimplemented("failed to run compute on gpu!".to_owned()))
             }
         }
-        panic!("failed to run compute on gpu!")
+        return TensorOperationResult::Error(TensorError::Unimplemented("failed to run compute on gpu!".to_owned()))
     }
 }
