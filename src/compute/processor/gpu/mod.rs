@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 pub mod shader;
 use shader::Shader;
-use crate::compute::tensor::{Operation, TensorOperationResult};
+use crate::compute::tensor::{Operation, SupportedDataTypes, Tensor, TensorOperationResult};
 use crate::compute::processor::Compiled;
 
 pub struct GPU {
@@ -15,12 +15,14 @@ pub struct GPU {
     pub(crate) queue: Option<Queue>
 }
 
-impl<'a> super::AbstractProcessor<'a> for GPU {
-    fn build(&mut self, op: Operation<'a>) -> Compiled<'a> {
-        Compiled::GPU(Rc::new(RefCell::new(Shader::build(op, self))))
+impl GPU {
+    pub(crate) fn build<'a, T>(&mut self, op: Operation<'a>, tensor: Tensor<T>) -> Compiled<'a, T> 
+    where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
+        Compiled::GPU(Rc::new(RefCell::new(Shader::build(op, self, tensor))))
     }
 
-    fn execute(&mut self, compiled: &Compiled<'a>) -> TensorOperationResult {
+    pub(crate) fn execute<'a, T>(&mut self, compiled: &Compiled<'a, T>) -> TensorOperationResult 
+    where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
         return match compiled {
             Compiled::GPU(c) => (*c.borrow_mut()).execute(self)
         }

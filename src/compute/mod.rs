@@ -5,13 +5,13 @@ use tensor::{Tensor, TensorError};
 use processor::{Processor, ProcessorSelectionConstraint};
 
 pub fn run() -> Vec<u32> {
-    build_shader();
+    //build_shader();
     //gpu::public_run()
     Vec::new()
 }
 
 pub fn build_shader() {
-    let a = Tensor::new(vec![1f32,1.0,1.0]);
+/*    let a = Tensor::new(vec![1f32,1.0,1.0]);
     let b = Tensor::new(vec![1f32,1.0,1.0]);
     let op = &a + &b;
     let mut gpu = Processor::new(ProcessorSelectionConstraint::None);
@@ -23,5 +23,5 @@ pub fn build_shader() {
         println!("{}", x);
     }
     let res2 = gpu.execute(&shader);
-    println!("{:?} + {:?} = {:?}", a.get_value(), b.get_value(), res2);
+    println!("{:?} + {:?} = {:?}", a.get_value(), b.get_value(), res2); */
 }

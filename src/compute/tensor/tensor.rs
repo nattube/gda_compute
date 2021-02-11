@@ -18,9 +18,13 @@ where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
         Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape)}
     }
 
-    pub fn from_shape(shape: Vec<usize>) -> Tensor<T> {
-        let vec = vec![T::get_zero(); shape.iter().sum()];
+    pub fn from_shape_and_value(value: T, shape: Vec<usize>) -> Tensor<T> {
+        let vec = vec![value; shape.iter().sum()];
         Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape)}
+    }
+
+    pub fn zeros_from_shape(shape: Vec<usize>) -> Tensor<T> {
+        Self::from_shape_and_value(T::get_zero(), shape)
     }
 
     pub fn is_single(&self) -> bool {
@@ -63,6 +67,26 @@ where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
 
     pub(crate) fn copy(&self) -> Tensor<T> {
         Tensor::with_shape(self.get_value().to_vec(), self.get_shape().to_vec())
+    }
+
+    pub(crate) fn same_shape_as<U>(&self, other: &Tensor<U>) -> bool 
+    where U: SupportedDataTypes + SupportedDataTypes<BindingType = U> {
+        let s1 = &*self.get_shape();
+        let s2 = &*other.get_shape();
+
+        if s1.len() != s2.len() {return false}
+        if s1.iter().zip(s2).any(|(x,y)| x != y) {return false}
+
+        true
+    }
+
+    pub(crate) fn matches_shape(&self, s2: &Shape) -> bool  {
+        let s1 = &*self.get_shape();
+
+        if s1.len() != s2.len() {return false}
+        if s1.iter().zip(s2).any(|(x,y)| x != y) {return false}
+
+        true
     }
 }
 

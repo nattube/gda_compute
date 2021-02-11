@@ -37,6 +37,7 @@ pub trait SupportedDataTypes: bytemuck::Pod + Clone {
     fn to_data_holder(vec: &Tensor<Self::BindingType>) -> TensorHolder;
     fn strength() -> usize;
     fn get_zero() -> Self::BindingType;
+    fn get_tensor(res: TensorOperationResult, wanted_shape: &Shape) -> Result<Tensor<Self::BindingType>, TensorError>;
 }
 
 pub struct TensorBinding<'a> {

@@ -2,9 +2,9 @@ use std::{convert::TryInto};
 use wgpu::util::DeviceExt;
 use wgpu::{Buffer, ComputePipeline, BindGroup, BindGroupLayout, Device};
 use wgpu;
-use crate::compute::tensor::{Operation, Tensor, TensorBinding, TensorError, TensorOperationResult, TensorHolder};
+use crate::compute::tensor::{Operation, SupportedDataTypes, Tensor, TensorBinding, TensorError, TensorOperationResult, TensorHolder};
 
-pub struct Shader<'a> {
+pub struct Shader<'a, T> {
     spirv: Vec<u8>,
     result_binding: u32,
     inputs: Vec<TensorBinding<'a>>,
@@ -15,11 +15,13 @@ pub struct Shader<'a> {
     storage_buffers: Vec<Buffer>,
     result_buffer: Buffer,
     result_size: wgpu::BufferAddress,
+    pub(crate) result_tensor: Tensor<T>,
     tensor_result: TensorOperationResult
 }
 
-impl<'a> Shader<'a> {
-    pub(crate) fn build(op: Operation<'a>, gpu: &mut super::GPU) -> Shader<'a> { 
+impl<'a, T> Shader<'a, T> 
+where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
+    pub(crate) fn build(op: Operation<'a>, gpu: &mut super::GPU, result_tensor: Tensor<T>) -> Shader<'a, T> { 
         if let Some(device) = gpu.device.as_mut() {            
             let (spirv, inputs, result_binding) = op.build_gpu(); 
 
@@ -48,7 +50,7 @@ impl<'a> Shader<'a> {
             });
 
             let storage_buffers: Vec<wgpu::Buffer> = inputs.iter().map(|i| {
-                Shader::get_buffer(device, &i.value, "Storage Buffer")
+                Self::get_buffer(device, &i.value, "Storage Buffer")
             }).collect();            
 
             let result_buffer = Self::get_buffer_from_opres(device, &tensor_result, "Result Buffer");
@@ -119,7 +121,7 @@ impl<'a> Shader<'a> {
                 },
             });
             
-            return Shader {spirv, result_binding, inputs, staging_buffer, compute_pipeline, storage_buffers, bind_group, bind_group_layout, result_buffer, result_size: size, tensor_result}
+            return Shader {spirv, result_binding, inputs, staging_buffer, compute_pipeline, storage_buffers, bind_group, bind_group_layout, result_buffer, result_size: size, tensor_result, result_tensor}
         }
         panic!("No GPU!");
     }
@@ -214,7 +216,7 @@ impl<'a> Shader<'a> {
             for i in 0..self.inputs.len() {
                 if self.inputs[i].has_changed() {
                     changed = true;
-                    self.storage_buffers[i] = Shader::get_buffer(device, &self.inputs[i].value, "Storage Buffer");
+                    self.storage_buffers[i] = Self::get_buffer(device, &self.inputs[i].value, "Storage Buffer");
                 }
             }
 
