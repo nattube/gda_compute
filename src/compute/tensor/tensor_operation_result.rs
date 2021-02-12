@@ -129,7 +129,14 @@ impl TensorOperationResult {
                 if s1.len() != s2.len() {return Err(TensorError::ShapeError("Add shapes not matching".to_string()))}
                 if s1.iter().zip(s2).any(|(a, b)| a != b) {return Err(TensorError::ShapeError("Add shapes not matching".to_string()))}
                 Ok(s1.to_vec())
-            }
+            },
+            TwoValueOperation::Subtract => {
+                if s1.len() == 1 && s1[0] == 1 {return Ok(s2.to_vec())}
+                if s2.len() == 1 && s2[0] == 1  {return Ok(s1.to_vec())}
+                if s1.len() != s2.len() {return Err(TensorError::ShapeError("Add shapes not matching".to_string()))}
+                if s1.iter().zip(s2).any(|(a, b)| a != b) {return Err(TensorError::ShapeError("Add shapes not matching".to_string()))}
+                Ok(s1.to_vec())
+            },
             _ =>  Err(TensorError::ShapeError("Unknown shape for unknown operation".to_string()))
         }
     }

@@ -51,7 +51,8 @@ pub type Shape = Vec<usize>;
 pub struct Tensor<T> {
     pub(crate) value: RefCell<Vec<T>>,
     pub(crate) change: Rc<RefCell<u32>>,
-    pub(crate) shape: RefCell<Shape>
+    pub(crate) shape: RefCell<Shape>,
+    pub(crate) is_const: bool
 }
 
 pub enum KnownOperation {

@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::cell::Ref;
 use std::rc::Rc;
-use std::ops::{Add};
+use std::ops::{Add, Sub, Index, IndexMut};
 use std::fmt;
 use std::fmt::Debug;
 
@@ -11,16 +11,16 @@ impl<T> Tensor<T>
 where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
     pub fn new(vec: Vec<T>) -> Tensor<T> {
         let shape = vec![vec.len(); 1];
-        Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape)}
+        Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape), is_const: false}
     }
 
     pub fn with_shape(vec: Vec<T>, shape: Shape) -> Tensor<T> {
-        Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape)}
+        Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape), is_const: false}
     }
 
     pub fn from_shape_and_value(value: T, shape: Vec<usize>) -> Tensor<T> {
         let vec = vec![value; shape.iter().sum()];
-        Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape)}
+        Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape), is_const: false}
     }
 
     pub fn zeros_from_shape(shape: Vec<usize>) -> Tensor<T> {
@@ -39,11 +39,61 @@ where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
         self.value.borrow()
     }
 
+    pub fn get(&self, index: &[usize]) -> T {
+        let shape = &*self.get_shape();
+        let value = &*self.get_value();
+
+        if shape.len() != index.len() {panic!("Tensor: Index out of Bounds")}
+
+        let mut sum = 0;
+        let last = index.len()-1;
+
+        for i in 0..last {
+            let temp = index[i];
+            if temp > shape[i] {panic!("Tensor: Index out of Bounds")}
+            sum += temp*shape[i+1]
+        }
+
+        let temp = index[last];
+        if temp > shape[last] {panic!("Tensor: Index out of Bounds")}
+        sum += temp;
+
+        if sum > self.shape_len() {panic!("Impossible index out of Bounds???")}
+
+        value[sum]
+    }
+
+    pub fn set(&self, index: &[usize], val: T) {
+        let shape = &*self.get_shape();
+        if shape.len() != index.len() {panic!("Tensor: Index out of Bounds")}
+
+        let mut sum = 0;
+        let last = index.len()-1;
+
+        for i in 0..last {
+            let temp = index[i];
+            if temp > shape[i] {panic!("Tensor: Index out of Bounds")}
+            sum += temp*shape[i+1]
+        }
+
+        let temp = index[last];
+        if temp > shape[last] {panic!("Tensor: Index out of Bounds")}
+        sum += temp;
+
+
+        if sum > self.shape_len() {panic!("Impossible index out of Bounds???")}
+
+        *self.change.borrow_mut() += 1;
+        self.value.borrow_mut()[sum] = val;
+    }
+
     pub fn get_shape(&self) -> Ref<Shape> {
         self.shape.borrow()
     }
 
     pub fn change_value(&self, mut val: Vec<T>) -> Result<(), TensorError> {
+        if(self.is_const) {panic!("Tensor is defined as constant and therefor not changeable")}
+
         let target_length = self.shape_len();
         let actual_length = val.len();
         
@@ -126,6 +176,45 @@ where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
         }
     }
 }
+
+
+impl<'a, T, U> Sub<&'a Tensor<U>> for &'a Tensor<T>
+where T: SupportedDataTypes + SupportedDataTypes<BindingType = T>,
+      U: SupportedDataTypes + SupportedDataTypes<BindingType = U> {
+    type Output = Operation<'a>;
+
+    fn sub(self, other: &'a Tensor<U>) -> Operation<'a> {
+        Operation::DualOp {
+            left: Box::new(Operation::Var(Box::new(TensorBinding::from_tensor(self, 0u32)))), 
+            right: Box::new(Operation::Var(Box::new(TensorBinding::from_tensor(other, 1u32)))),
+            result: TensorOperationResult::from_2(self, other, TwoValueOperation::Subtract),
+            op: TwoValueOperation::Subtract
+        }
+    }
+}
+
+impl<'a, T> Sub<Operation<'a>> for &'a Tensor<T>
+where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
+    type Output = Operation<'a>;
+
+    fn sub(self, op: Operation<'a>) -> Operation<'a> {
+        let result = TensorOperationResult::from_1_and_op(self, &op, TwoValueOperation::Subtract);
+        let binding = op.get_last_binding() + 1;
+
+        let tensor = match op.contains_tensor(self) {
+            Some(x) => x.copy(),
+            None => TensorBinding::from_tensor(self, binding)
+        };
+
+        Operation::DualOp {
+            left: Box::new(Operation::Var(Box::new(tensor))), 
+            right: Box::new(op),
+            result,
+            op: TwoValueOperation::Subtract
+        }
+    }
+}
+
 
 impl<T> Debug for Tensor<T>
 where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> + std::fmt::Display, 

@@ -1,7 +1,7 @@
 use std::fmt::Write;
 use std::cmp;
 
-use std::ops::{Add};
+use std::ops::{Add, Sub};
 
 use super::{Operation, SupportedDataTypes, TensorOperationResult, Tensor, TensorBinding, TwoValueOperation, INPUT_NAME};
 
@@ -54,16 +54,13 @@ impl<'a> Operation<'a> {
         
         writeln!(&mut s);
         
-        let mut binding: u32 = 0;
+        let mut binding: u32 = self.get_last_binding() +1;
 
         for i in &inputs {
             writeln!(&mut s, "readonly layout(set = 0, binding = {}) buffer b{} {{", (*i).id, (*i).id);
             writeln!(&mut s, "{} {}{};", (*i).get_type_glsl(), INPUT_NAME, (*i).id);
             writeln!(&mut s, "}};");
             writeln!(&mut s);
-            if binding < (*i).id {
-                binding = (*i).id+1;
-            }
         }
 
         writeln!(&mut s, "layout(set = 0, binding = {}) buffer b{} {{", binding, binding);
@@ -134,8 +131,8 @@ where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
         };
 
         Operation::DualOp {
-            left: Box::new(Operation::Var(Box::new(tensor))), 
-            right: Box::new(self),
+            left: Box::new(self),
+            right: Box::new(Operation::Var(Box::new(tensor))), 
             result,
             op: TwoValueOperation::Add
         }
@@ -151,10 +148,51 @@ impl<'a> Add<Operation<'a>> for Operation<'a> {
         op.reset_binding_from(binding+1);
 
         Operation::DualOp {
-            left: Box::new(op), 
-            right: Box::new(self),
+            left: Box::new(self), 
+            right: Box::new(op),
             result,
             op: TwoValueOperation::Add
+        }
+    }
+}
+
+
+
+impl<'a, T> Sub<&'a Tensor<T>> for Operation<'a>
+where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
+    type Output = Operation<'a>;
+
+    fn sub(self, tensor: &'a Tensor<T>) -> Operation<'a> {
+        let result = TensorOperationResult::from_1_and_op(tensor, &self, TwoValueOperation::Subtract);
+        let binding = self.get_last_binding() + 1;
+
+        let tensor = match self.contains_tensor(tensor) {
+            Some(x) => x.copy(),
+            None => TensorBinding::from_tensor(tensor, binding)
+        };
+
+        Operation::DualOp {
+            left:  Box::new(self),
+            right: Box::new(Operation::Var(Box::new(tensor))),
+            result,
+            op: TwoValueOperation::Subtract
+        }
+    }
+}
+
+impl<'a> Sub<Operation<'a>> for Operation<'a> {
+    type Output = Operation<'a>;
+
+    fn sub(self, mut op: Operation<'a>) -> Operation<'a> {
+        let result = TensorOperationResult::from_2_ops(&op, &self, TwoValueOperation::Subtract);
+        let binding = self.get_last_binding();
+        op.reset_binding_from(binding+1);
+
+        Operation::DualOp {
+            left: Box::new(self), 
+            right: Box::new(op),
+            result,
+            op: TwoValueOperation::Subtract
         }
     }
 }
