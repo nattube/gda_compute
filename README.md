@@ -35,7 +35,7 @@ let result2 = gpu.execute(&shader).unwrap(); // result2 = [6.0, 5.0, 4.0]
 ```
 
 Note: If you want to build the project you currently need an installation of shaderc on your system. In the future I want to get rid of this dependency,
-either by building spirv directly or more likely building WGSL as soon as it is stabalize in wgpu. 
+either by building spirv directly or more likely building WGSL as soon as it is somewhat stable in wgpu. 
 More information is provider here: https://github.com/google/shaderc
 
 ## Todos
