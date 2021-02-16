@@ -34,7 +34,7 @@ b.change_value(vec![5f32,4.0,3.0]); /* change the whole value, no shape changing
 let result2 = gpu.execute(&shader).unwrap(); // result2 = [6.0, 5.0, 4.0]
 ```
 
-Note: If you want to build the project you currently need an installation of shaderc on your system. In the future I want to get rid of this dependency,
+Note: If you want to use the project you currently need an installation of shaderc on your system. In the future I want to get rid of this dependency,
 either by building spirv directly or more likely building WGSL as soon as it is somewhat stable in wgpu. 
 More information on shaderc is provided here: https://github.com/google/shaderc
 
