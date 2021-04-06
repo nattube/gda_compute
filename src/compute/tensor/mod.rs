@@ -87,3 +87,54 @@ pub enum Operation<'a> {
     SingleOp {value: Box<Operation<'a>>, result: TensorOperationResult, op: SingleValueOperation},
     DualOp {left: Box<Operation<'a>>, right: Box<Operation<'a>>, result: TensorOperationResult, op: TwoValueOperation},
 }
+
+pub struct ShaderBuilder {
+    inputs: String,
+    main: String,
+    functions: String
+}
+
+
+pub trait DualInstruction {
+    fn build_gpu(left: String, right: String) -> String;
+    fn build_cpu<T>(left: T, right: T) -> T
+        where T: SupportedDataTypes + SupportedDataTypes<BindingType = T>;
+}
+
+pub struct Add {}
+
+impl DualInstruction for Add {
+    fn build_gpu(left: String, right: String) -> String {
+        let mut res = String::new();
+        write!(&mut res, "{} + {}", left, right);
+        res
+    }
+
+    fn build_cpu<T>(left: T, right: T) -> T
+        where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> 
+    {
+        T + T
+    }
+}
+
+pub trait TOperation {
+    pub fn is_valid(shape1: Shape, shape2: Shape) -> bool;
+    pub fn result_shape(shape1: Shape, shape2: Shape) -> Shape;
+    pub fn array_order(shape1: Shape, shape2: Shape) -> (Vec<usize>, Vec<usize>);
+}
+
+pub struct MatMul {}
+
+impl TOperation for MatMul {
+    pub fn is_valid(shape1: Shape, shape2: Shape) -> bool {
+        shape1.len()
+    }
+
+    pub fn result_shape(shape1: Shape, shape2: Shape) -> Shape {
+
+    }
+
+    pub fn array_order(shape1: Shape, shape2: Shape) -> (Vec<usize>, Vec<usize>) {
+
+    }
+}

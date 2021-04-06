@@ -19,7 +19,7 @@ where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
     }
 
     pub fn from_shape_and_value(value: T, shape: Vec<usize>) -> Tensor<T> {
-        let vec = vec![value; shape.iter().sum()];
+        let vec = vec![value; shape.iter().product()];
         Tensor {value: RefCell::new(vec), change: Rc::new(RefCell::new(0)), shape: RefCell::new(shape), is_const: false}
     }
 
@@ -32,7 +32,7 @@ where T: SupportedDataTypes + SupportedDataTypes<BindingType = T> {
     }
 
     pub fn shape_len(&self) -> usize {
-        self.shape.borrow().iter().sum()
+        self.shape.borrow().iter().product()
     }
 
     pub fn get_value(&self) -> Ref<Vec<T>> {
