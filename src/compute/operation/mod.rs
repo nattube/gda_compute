@@ -1,9 +1,64 @@
 use std::cmp;
+use std::collections::HashMap;
+use super::instruction::*;
+
+
+pub enum Identifier {
+    Value(usize),
+    SingleResult(usize, Identifier, Box<dyn SingleInstruction>),
+    DualResult(usize, Identifier, Identifier, Box<dyn DualInstruction>)
+}
+
+pub struct LocalScope {
+    global: HashMap<String, Identifier>,
+    local: HashMap<String, Identifier>,
+}
+
+pub struct FunctionBuilder {
+    scope: LocalScope,
+    returns: String,
+    arguments: Vec<Identifier>,
+
+}
+
+pub struct OperationBuilder {
+    
+}
+
+impl OperationBuilder {
+
+}
+
 
 pub trait TOperation {
-    pub fn is_valid(shape1: Shape, shape2: Shape) -> bool;
-    pub fn result_shape(shape1: Shape, shape2: Shape) -> Shape;
-    pub fn array_order(shape1: Shape, shape2: Shape) -> (Vec<usize>, Vec<usize>);
+    pub fn takes() -> usize;
+    pub fn is_valid(shapes: Vec<Shape>) -> bool;
+    pub fn result_shape(shapes: Vec<Shape>) -> Shape;
+    pub fn indexing_function(shapes: Vec<Shape>, scope: LocalScope) -> Option<Vec<Instructions>>;
+    pub fn max_steps(shapes: Vec<Shape>) -> (usize, usize, usize);
+    pub fn build(inputs: Vec<Instructions>) -> Instructions;
+}
+
+pub struct MatAdd {}
+
+impl TOperation for MatAdd {
+    pub fn takes() -> usize { 2 }
+    pub fn is_valid(shapes: Vec<Shape>) -> bool {
+           shapes[0].len() >= shapes[1].len() 
+        && !shapes[1].iter().zip(shapes[0]).any(|(x,y)| x != y)
+    }
+    pub fn result_shape(shapes: Vec<Shape>) -> Shape {
+        shape[0]
+    }
+    pub fn indexing_function(shapes: Vec<Shape>, ctx: &mut LocalScope) -> Option<Vec<Instructions>>{
+        None
+    }
+    pub fn max_steps(shapes: Vec<Shape>) -> (usize, usize, usize) {
+        (shapes[0].iter().product(), 1, 1)
+    }
+    pub fn build(inputs: Vec<Instructions>, ctx: &mut LocalScope) -> Instructions {
+        IAdd.build(inputs)
+    }
 }
 
 pub struct MatMul {}
@@ -58,5 +113,16 @@ impl TOperation for MatMul {
 
     pub fn array_order(shape1: Shape, shape2: Shape) -> (Vec<usize>, Vec<usize>) {
         
+    }
+
+    pub fn build(ctx: LocalScope) {
+        let t2 = ctx.get("tensor1");
+        let t1 = ctx.get("tensor2");
+        let mut result = ctx.get("result");
+
+        let cnst = ctx.define_const("by_two", 2);
+        let inter = ctx.set("intermediat", t1[step] + t2[step]);
+
+        result[step] = inter * cnst;
     }
 }
